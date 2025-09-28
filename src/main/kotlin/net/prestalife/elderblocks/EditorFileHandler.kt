@@ -23,6 +23,8 @@ class EditorFileHandler {
     val ages = mutableMapOf<String, Long>()
     private var scheduledTask: ScheduledFuture<*>? = null
 
+    val foldingModelsWithListener = mutableListOf<FoldingModel>()
+
     constructor(project: Project) {
         this.project = project
 
@@ -41,19 +43,23 @@ class EditorFileHandler {
     fun fileOpened(source: FileEditorManager, file: VirtualFile) {
         val editor = getEditorForFile(source, file)
         if (editor != null) {
-            // Add folding listener to detect when blocks are unfolded
-            (editor as EditorEx).foldingModel.addListener(object : FoldingListener {
-                override fun onFoldRegionStateChange(foldRegion: FoldRegion) {
-                    if (foldRegion.isExpanded) {
-                        // Block was unfolded, reset its age
-                        val content = foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
-                        val hash = content.hashCode()
-                        val key = file.path + ":" + hash.toString()
-                        ages[key] = 0
-                        println("Block unfolded in ${file.name}, age reset for key: $key")
+            if (!foldingModelsWithListener.contains(editor.foldingModel)) {
+                // Add folding listener to detect when blocks are unfolded
+                (editor as EditorEx).foldingModel.addListener(object : FoldingListener {
+                    override fun onFoldRegionStateChange(foldRegion: FoldRegion) {
+                        if (foldRegion.isExpanded) {
+                            // Block was unfolded, reset its age
+                            val content =
+                                foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
+                            val hash = content.hashCode()
+                            val key = file.path + ":" + hash.toString()
+                            ages[key] = -5000
+                            println("Block unfolded in ${file.name}, age reset for key: $key")
+                        }
                     }
-                }
-            }, project)
+                }, project)
+                foldingModelsWithListener.add(editor.foldingModel)
+            }
 
             ApplicationManager.getApplication().runReadAction(Runnable {
                 val foldingBlocks = getFoldingBlocks(editor)
@@ -98,7 +104,8 @@ class EditorFileHandler {
             lastAgeUpdate = now
         }
 
-        ages.entries.map { ages[it.key] = ages[it.key]!! + now - lastAgeUpdate }
+        val diff = now - lastAgeUpdate
+        ages.entries.map { ages[it.key] = ages[it.key]!! + diff }
         lastAgeUpdate = now
 
         // get ages older than 3 seconds
