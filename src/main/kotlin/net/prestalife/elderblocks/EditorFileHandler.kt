@@ -86,7 +86,7 @@ class EditorFileHandler {
         lastAgeUpdate = now
 
         // get ages older than 3 seconds
-        val oldBlocks = ages.entries.filter { it.value > 3000 }
+        val oldBlocks = ages.entries.filter { it.value > 5000 }
         val fileBlocksMap = mutableMapOf<String, List<FoldRegion>>()
         val blockHashMap = mutableMapOf<String, Int>()
 
@@ -95,7 +95,7 @@ class EditorFileHandler {
         ApplicationManager.getApplication().invokeAndWait {
             run {
                 WriteCommandAction.runWriteCommandAction(project) {
-                    val foldProcess = Runnable {
+                    foldingModel?.runBatchFoldingOperation(Runnable {
                         oldBlocks.forEach {
                             val parts = it.key.split(":")
                             val filePath = parts[0]
@@ -123,8 +123,7 @@ class EditorFileHandler {
                                 ages.remove(it.key)
                             }
                         }
-                    }
-                    foldingModel?.runBatchFoldingOperation(foldProcess)
+                    })
                 }
             }
         }
