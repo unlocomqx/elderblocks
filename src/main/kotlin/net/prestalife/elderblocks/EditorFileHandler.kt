@@ -5,6 +5,8 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.FoldRegion
 import com.intellij.openapi.editor.FoldingModel
+import com.intellij.openapi.editor.ex.EditorEx
+import com.intellij.openapi.editor.ex.FoldingListener
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
@@ -39,6 +41,20 @@ class EditorFileHandler {
     fun fileOpened(source: FileEditorManager, file: VirtualFile) {
         val editor = getEditorForFile(source, file)
         if (editor != null) {
+            // Add folding listener to detect when blocks are unfolded
+            (editor as EditorEx).foldingModel.addListener(object : FoldingListener {
+                override fun onFoldRegionStateChange(foldRegion: FoldRegion) {
+                    if (foldRegion.isExpanded) {
+                        // Block was unfolded, reset its age
+                        val content = foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
+                        val hash = content.hashCode()
+                        val key = file.path + ":" + hash.toString()
+                        ages[key] = 0
+                        println("Block unfolded in ${file.name}, age reset for key: $key")
+                    }
+                }
+            }, project)
+
             ApplicationManager.getApplication().runReadAction(Runnable {
                 val foldingBlocks = getFoldingBlocks(editor)
                 // Process folding blocks as needed
@@ -89,48 +105,65 @@ class EditorFileHandler {
         val oldBlocks = ages.entries.filter { it.value > 5000 }
         val fileBlocksMap = mutableMapOf<String, List<FoldRegion>>()
         val blockHashMap = mutableMapOf<String, Int>()
-
-        val foldingModel = getFoldingModel(project)
+        val foldingModelsMap = mutableMapOf<FoldingModel, List<FoldRegion>>()
 
         ApplicationManager.getApplication().invokeAndWait {
             run {
                 WriteCommandAction.runWriteCommandAction(project) {
-                    foldingModel?.runBatchFoldingOperation(Runnable {
-                        oldBlocks.forEach {
-                            val parts = it.key.split(":")
-                            val filePath = parts[0]
-                            val hash = parts[1].toInt()
-                            var found = false
-                            val foldingBlocks =
-                                fileBlocksMap.getOrDefault(filePath, getFoldingBlocksForFile(filePath))
+                    oldBlocks.forEach {
+                        val parts = it.key.split(":")
+                        val filePath = parts[0]
+                        val hash = parts[1].toInt()
+                        var found = false
+                        val foldingModel = getFoldingModel(filePath)
+                        if (foldingModel == null) {
+                            return@forEach
+                        }
+                        val foldingBlocks =
+                            fileBlocksMap.getOrDefault(filePath, getFoldingBlocksForFile(filePath))
 
-                            foldingBlocks.forEach { foldRegion ->
-                                val blockKey = filePath + ":" + foldRegion.startOffset + ":" + foldRegion.endOffset
-                                val contentHash =
-                                    blockHashMap.getOrDefault(blockKey, getFoldingRegionHash(foldRegion))
+                        foldingBlocks.forEach { foldRegion ->
+                            val blockKey = filePath + ":" + foldRegion.startOffset + ":" + foldRegion.endOffset
+                            val contentHash =
+                                blockHashMap.getOrDefault(blockKey, getFoldingRegionHash(foldRegion))
 
-                                if (contentHash == hash) {
-                                    if (foldRegion.isExpanded) {
-                                        foldRegion.isExpanded = false
-                                    }
-                                    ages.remove(it.key)
-                                    found = true
-                                    return@forEach
+                            if (contentHash == hash) {
+                                if (foldRegion.isExpanded) {
+                                    val foldingModelRegions = foldingModelsMap.getOrDefault(foldingModel, emptyList())
+                                    foldingModelsMap.put(foldingModel, foldingModelRegions + foldRegion)
                                 }
-                            }
-                            if (!found) {
-                                // cleanup
                                 ages.remove(it.key)
+                                found = true
+                                return@forEach
                             }
                         }
-                    })
+                        if (!found) {
+                            // cleanup
+                            ages.remove(it.key)
+                        }
+                    }
+
+                    foldingModelsMap.forEach { (foldingModel, foldingBlocks) ->
+                        foldingModel.runBatchFoldingOperation {
+                            foldingBlocks.forEach { foldRegion ->
+                                foldRegion.isExpanded = false
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
-    private fun getFoldingModel(project: Project): FoldingModel? {
-        return FileEditorManager.getInstance(project).selectedTextEditor?.foldingModel
+    private fun getFoldingModel(filePath: String): FoldingModel? {
+        val file = VirtualFileManager.getInstance().findFileByUrl("file://$filePath");
+        if (file != null) {
+            val editor = getEditorForFile(FileEditorManager.getInstance(project), file)
+            if (editor != null) {
+                return editor.foldingModel
+            }
+        }
+        return null
     }
 
     private fun getFoldingRegionHash(foldRegion: FoldRegion): Int {
