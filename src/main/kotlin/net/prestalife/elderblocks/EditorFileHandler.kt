@@ -1,31 +1,54 @@
 package net.prestalife.elderblocks
 
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.WriteIntentReadAction
+import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.FoldRegion
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.util.concurrency.AppExecutorUtil
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
+
 
 class EditorFileHandler {
     var project: Project
-    val ages = mutableMapOf<Int, Int>()
+    var lastAgeUpdate: Long = 0
+    val ages = mutableMapOf<String, Long>()
+    private var scheduledTask: ScheduledFuture<*>? = null
 
     constructor(project: Project) {
         this.project = project
+
+        // Schedule a periodic task
+        scheduledTask = AppExecutorUtil.getAppScheduledExecutorService().scheduleWithFixedDelay(
+            {
+                // Your periodic task logic here
+                foldOldBlocks()
+            },
+            0,    // Initial delay
+            1,    // Period between executions
+            TimeUnit.SECONDS  // Time unit
+        )
     }
 
     fun fileOpened(source: FileEditorManager, file: VirtualFile) {
         val editor = getEditorForFile(source, file)
         if (editor != null) {
-            val foldingBlocks = getFoldingBlocks(editor)
-            // Process folding blocks as needed
-            processFoldingBlocks(foldingBlocks, file)
+            ApplicationManager.getApplication().runReadAction(Runnable {
+                val foldingBlocks = getFoldingBlocks(editor)
+                // Process folding blocks as needed
+                processFoldingBlocks(foldingBlocks, file)
+            })
         }
     }
 
     fun fileClosed(source: FileEditorManager, file: VirtualFile) {
-        // Clean up any resources related to this file if needed
+        ages.entries.removeIf { it.key.startsWith(file.path) }
     }
 
     private fun getEditorForFile(fileEditorManager: FileEditorManager, file: VirtualFile): Editor? {
@@ -47,29 +70,56 @@ class EditorFileHandler {
         foldingBlocks.forEach { foldRegion ->
             val content = foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
             val hash = content.hashCode()
+            val key: String = file.path + ":" + hash.toString()
             // set the age to 0
-            ages[hash] = 0
+            ages[key] = 0
         }
     }
 
-    // Alternative method to get folding blocks when you have direct access to an editor
-    fun getFoldingBlocksForCurrentEditor(): List<FoldRegion>? {
-        val fileEditorManager = FileEditorManager.getInstance(project)
-        val selectedEditor = fileEditorManager.selectedTextEditor
+    private fun foldOldBlocks() {
+        val now = System.currentTimeMillis()
+        if (lastAgeUpdate == 0L) {
+            lastAgeUpdate = now
+        }
 
-        return selectedEditor?.let { editor ->
-            editor.foldingModel.allFoldRegions.toList()
+        ages.entries.map { ages[it.key] = ages[it.key]!! + now - lastAgeUpdate }
+        lastAgeUpdate = now
+
+        // get ages older than 3 seconds
+        val oldBlocks = ages.entries.filter { it.value > 3000 }
+        ApplicationManager.getApplication().invokeAndWait {
+            WriteIntentReadAction.run {
+                WriteCommandAction.runWriteCommandAction(project) {
+                    oldBlocks.forEach {
+                        val parts = it.key.split(":")
+                        val filePath = parts[0]
+                        val hash = parts[1].toInt()
+
+                        // fold the block
+                        val file = VirtualFileManager.getInstance().findFileByUrl("file://$filePath");
+                        if (file != null) {
+                            val editor = getEditorForFile(FileEditorManager.getInstance(project), file)
+                            if (editor != null) {
+                                val foldingBlocks = getFoldingBlocks(editor)
+                                foldingBlocks.forEach { foldRegion ->
+                                    val content =
+                                        foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
+                                    val contentHash = content.hashCode()
+                                    if (contentHash == hash) {
+                                        foldRegion.isExpanded = false
+                                        ages.remove(it.key)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
-    // Method to get folding blocks for a specific file by path
-    fun getFoldingBlocksForFile(filePath: String): List<FoldRegion>? {
-        val fileEditorManager = FileEditorManager.getInstance(project)
-        val virtualFile = project.baseDir?.findFileByRelativePath(filePath)
-
-        return virtualFile?.let { file ->
-            val editor = getEditorForFile(fileEditorManager, file)
-            editor?.let { getFoldingBlocks(it) }
-        }
+    // Call this method to clean up resources when the handler is no longer needed
+    fun dispose() {
+        scheduledTask?.cancel(true)
     }
 }
