@@ -14,10 +14,12 @@ class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
 
     override fun createComponent(): JComponent {
         return panel {
-            row("Age threshold (seconds):") {
-                textField()
-                    .bindText(::ageField)
-                    .comment("Blocks will be folded after this many seconds of inactivity")
+            group("Elder Blocks") {
+                row("Age threshold (seconds):") {
+                    textField()
+                        .bindText(::ageField)
+                        .comment("Blocks will be folded after this many seconds of inactivity")
+                }
             }
         }
     }
@@ -36,7 +38,7 @@ class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
 class ElderBlocksFoldingSettings : PersistentStateComponent<ElderBlocksFoldingSettings.State> {
 
     data class State(
-        var oldAge: Int = 30,
+        var oldAge: Int = 60,
     )
 
     private var state = State()
