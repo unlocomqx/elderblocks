@@ -25,8 +25,7 @@ class EditorFileHandler {
 
     val foldingModelsWithListener = mutableListOf<FoldingModel>()
 
-    val delaySeconds = 3L
-    val oldAge = 3000L
+    val delaySeconds = 5L
 
     constructor(project: Project) {
         this.project = project
@@ -44,27 +43,10 @@ class EditorFileHandler {
     }
 
     fun fileOpened(source: FileEditorManager, file: VirtualFile) {
-        ages[file.path] = mutableMapOf()
         val editor = getEditorForFile(source, file)
         if (editor != null) {
-            if (!foldingModelsWithListener.contains(editor.foldingModel)) {
-                // Add folding listener to detect when blocks are unfolded
-                (editor as EditorEx).foldingModel.addListener(object : FoldingListener {
-                    override fun onFoldRegionStateChange(foldRegion: FoldRegion) {
-                        if (foldRegion.isExpanded) {
-                            // Block was unfolded, reset its age
-                            val content =
-                                foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
-                            val hash = content.hashCode()
-                            ages[file.path]?.put(hash, -oldAge)
-                            println("Block unfolded in ${file.name}, age reset for key: ${file.path}:${hash}")
-                        }
-                    }
-                }, project)
-                foldingModelsWithListener.add(editor.foldingModel)
-            }
-
             ApplicationManager.getApplication().runReadAction(Runnable {
+                ages[file.path] = mutableMapOf()
                 val foldingBlocks = getFoldingBlocks(editor)
                 // Process folding blocks as needed
                 foldingBlocks.forEach { foldRegion ->
@@ -72,6 +54,31 @@ class EditorFileHandler {
                         val hash = getFoldingRegionHash(foldRegion)
                         ages[file.path]?.put(hash, 0)
                     }
+                }
+
+                if (!foldingModelsWithListener.contains(editor.foldingModel)) {
+                    // Add folding listener to detect when blocks are unfolded
+                    (editor as EditorEx).foldingModel.addListener(object : FoldingListener {
+                        override fun onFoldRegionStateChange(foldRegion: FoldRegion) {
+                            val filePath = foldRegion.editor.virtualFile.path
+                            if(!ages.containsKey(filePath)) {
+                                return
+                            }
+                            if (foldRegion.isExpanded) {
+                                // Block was unfolded, reset its age
+                                val content =
+                                    foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
+                                val hash = content.hashCode()
+                                ages[filePath]?.containsKey(hash)?.let { keyExists ->
+                                    ages[filePath]?.put(
+                                        hash,
+                                        -(ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold - ElderBlocksFoldingSettings.instance.oldAge).toLong() * 1000
+                                    )
+                                }
+                            }
+                        }
+                    }, project)
+                    foldingModelsWithListener.add(editor.foldingModel)
                 }
             })
         }
@@ -126,7 +133,12 @@ class EditorFileHandler {
                             seenContentKeys.add(contentHash)
 
                             // if block is old and expanded
-                            if (age.value.getOrDefault(contentHash, 0L) > oldAge && foldRegion.isExpanded) {
+                            if (age.value.getOrDefault(
+                                    contentHash,
+                                    0L
+                                ) > ElderBlocksFoldingSettings.instance.oldAge * 1000 &&
+                                foldRegion.isExpanded
+                            ) {
                                 val foldingModelRegions = foldingModelsMap.getOrDefault(foldingModel, emptyList())
                                 foldingModelsMap.put(foldingModel, foldingModelRegions + foldRegion)
                                 ages[filePath]?.remove(contentHash)
@@ -134,7 +146,10 @@ class EditorFileHandler {
 
                             // if block does not exist in ages, add it
                             if (!age.value.contains(contentHash)) {
-                                ages[filePath]?.put(contentHash, -oldAge)
+                                ages[filePath]?.put(
+                                    contentHash,
+                                    -(ElderBlocksFoldingSettings.instance.reFoldAfterEdit - ElderBlocksFoldingSettings.instance.oldAge).toLong() * 1000
+                                )
                             }
                         }
 
@@ -145,8 +160,8 @@ class EditorFileHandler {
                     foldingModelsMap.forEach { (foldingModel, foldingBlocks) ->
                         foldingModel.runBatchFoldingOperation {
                             foldingBlocks.forEach { foldRegion ->
-                                foldRegion.isExpanded = false
-                                foldRegion.placeholderText = " \uD83D\uDCA4 "
+//                                foldRegion.isExpanded = false
+//                                foldRegion.placeholderText = " \uD83D\uDCA4 "
                             }
                         }
                     }
