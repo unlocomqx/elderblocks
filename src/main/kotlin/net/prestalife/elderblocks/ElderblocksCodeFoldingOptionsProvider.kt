@@ -1,37 +1,45 @@
-package net.prestalife.elderblocks;
+package net.prestalife.elderblocks
 
 import com.intellij.application.options.editor.CodeFoldingOptionsProvider
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
-import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.builder.text
 import javax.swing.JComponent
 
 class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
-    private var ageField: String = ElderBlocksFoldingSettings.instance.oldAge.toString()
-    private var reFoldAfterManualUnfoldField: String = ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold.toString()
-    private var reFoldAfterEditField: String = ElderBlocksFoldingSettings.instance.reFoldAfterEdit.toString()
-
+    private var oldAge: Int = ElderBlocksFoldingSettings.instance.oldAge
+    private var reFoldAfterManualUnfold: Int = ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold
+    private var reFoldAfterEdit: Int = ElderBlocksFoldingSettings.instance.reFoldAfterEdit
     override fun createComponent(): JComponent {
         return panel {
             group("Elder Blocks") {
                 row("Age threshold (seconds):") {
-                    textField()
-                        .bindText(::ageField)
+                    intTextField()
+                        .text(oldAge.toString())
+                        .onChanged {
+                            oldAge = it.text.toIntOrNull() ?: 0
+                        }
                         .comment("Blocks will be folded after this many seconds of inactivity (default: 60 seconds)")
                 }
 
                 row("Fold blocks that I manually unfolded after (seconds):") {
-                    textField()
-                        .bindText(::reFoldAfterManualUnfoldField)
+                    intTextField()
+                        .text(reFoldAfterManualUnfold.toString())
+                        .onChanged {
+                            reFoldAfterManualUnfold = it.text.toIntOrNull() ?: 0
+                        }
                         .comment("Blocks will be folded after this many seconds of inactivity (default: 90 seconds, 0 means never)")
                 }
 
                 row("Fold blocks that I edited after (seconds):") {
-                    textField()
-                        .bindText(::reFoldAfterEditField)
+                    intTextField()
+                        .text(reFoldAfterEdit.toString())
+                        .onChanged {
+                            reFoldAfterEdit = it.text.toIntOrNull() ?: 0
+                        }
                         .comment("Blocks will be folded after this many seconds of inactivity (default: 120 seconds, 0 means never)")
                 }
             }
@@ -39,21 +47,21 @@ class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
     }
 
     override fun isModified(): Boolean {
-        return ageField != ElderBlocksFoldingSettings.instance.oldAge.toString() ||
-               reFoldAfterManualUnfoldField != ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold.toString() ||
-               reFoldAfterEditField != ElderBlocksFoldingSettings.instance.reFoldAfterEdit.toString()
+        return oldAge != ElderBlocksFoldingSettings.instance.oldAge ||
+                reFoldAfterManualUnfold != ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold ||
+                reFoldAfterEdit != ElderBlocksFoldingSettings.instance.reFoldAfterEdit
     }
 
     override fun apply() {
-        ElderBlocksFoldingSettings.instance.oldAge = ageField.toIntOrNull() ?: 60
-        ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold = reFoldAfterManualUnfoldField.toIntOrNull() ?: 90
-        ElderBlocksFoldingSettings.instance.reFoldAfterEdit = reFoldAfterEditField.toIntOrNull() ?: 0
+        ElderBlocksFoldingSettings.instance.oldAge = oldAge
+        ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold = reFoldAfterManualUnfold
+        ElderBlocksFoldingSettings.instance.reFoldAfterEdit = reFoldAfterEdit
     }
 
     override fun reset() {
-        ageField = ElderBlocksFoldingSettings.instance.oldAge.toString()
-        reFoldAfterManualUnfoldField = ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold.toString()
-        reFoldAfterEditField = ElderBlocksFoldingSettings.instance.reFoldAfterEdit.toString()
+        oldAge = ElderBlocksFoldingSettings.instance.oldAge
+        reFoldAfterManualUnfold = ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold
+        reFoldAfterEdit = ElderBlocksFoldingSettings.instance.reFoldAfterEdit
     }
 }
 
