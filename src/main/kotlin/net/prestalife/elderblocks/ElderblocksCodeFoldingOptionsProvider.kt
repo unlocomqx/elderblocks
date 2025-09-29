@@ -3,21 +3,33 @@ package net.prestalife.elderblocks;
 import com.intellij.application.options.editor.CodeFoldingOptionsProvider
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
+import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
-import com.intellij.openapi.options.BeanConfigurable
+import com.intellij.ui.dsl.builder.bindText
+import com.intellij.ui.dsl.builder.panel
+import javax.swing.JComponent
 
-class ElderblocksCodeFoldingOptionsProvider :
-    BeanConfigurable<ElderBlocksFoldingSettings>(ElderBlocksFoldingSettings.instance), CodeFoldingOptionsProvider {
-    init {
-        title = "Unused Blocks"
-        checkBox(
-            "A code block is considered unused if it has not been used for more than:",
-            ElderBlocksFoldingSettings.instance::oldAge,
-        ) {
-            ElderBlocksFoldingSettings.instance.oldAge = it
+class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
+    private var ageField: String = ElderBlocksFoldingSettings.instance.oldAge.toString()
+
+    override fun createComponent(): JComponent {
+        return panel {
+            row("Age threshold (seconds):") {
+                textField()
+                    .bindText(::ageField)
+                    .comment("Blocks will be folded after this many seconds of inactivity")
+            }
         }
-
     }
+
+    override fun isModified(): Boolean {
+        return ageField != ElderBlocksFoldingSettings.instance.oldAge.toString()
+    }
+
+    override fun apply() {
+        ElderBlocksFoldingSettings.instance.oldAge = ageField.toIntOrNull() ?: 30
+    }
+
 }
 
 @State(name = "ElderBlocksFoldingSettings", storages = [(Storage("elderblocks.xml"))])
