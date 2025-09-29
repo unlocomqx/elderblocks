@@ -23,7 +23,7 @@ class EditorFileHandler {
     val ages = mutableMapOf<String, MutableMap<Int, Long>>()
     private var scheduledTask: ScheduledFuture<*>? = null
 
-    val foldingModelsWithListener = mutableListOf<FoldingModel>()
+    val foldProcessed = mutableMapOf<String, Boolean>()
 
     val delaySeconds = 5L
 
@@ -56,36 +56,40 @@ class EditorFileHandler {
                     }
                 }
 
-                if (!foldingModelsWithListener.contains(editor.foldingModel)) {
-                    // Add folding listener to detect when blocks are unfolded
-                    (editor as EditorEx).foldingModel.addListener(object : FoldingListener {
-                        override fun onFoldRegionStateChange(foldRegion: FoldRegion) {
-                            val filePath = foldRegion.editor.virtualFile.path
-                            if(!ages.containsKey(filePath)) {
-                                return
-                            }
-                            if (foldRegion.isExpanded) {
-                                // Block was unfolded, reset its age
-                                val content =
-                                    foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
-                                val hash = content.hashCode()
-                                ages[filePath]?.containsKey(hash)?.let { keyExists ->
-                                    ages[filePath]?.put(
-                                        hash,
-                                        -(ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold - ElderBlocksFoldingSettings.instance.oldAge).toLong() * 1000
-                                    )
-                                }
+                // Add folding listener to detect when blocks are unfolded
+                (editor as EditorEx).foldingModel.addListener(object : FoldingListener {
+                    override fun onFoldRegionStateChange(foldRegion: FoldRegion) {
+                        val filePath = foldRegion.editor.virtualFile.path
+                        if(filePath != file.path || foldProcessed[filePath] != true || !ages.containsKey(filePath)) {
+                            return
+                        }
+                        if (foldRegion.isExpanded) {
+                            // Block was unfolded, reset its age
+                            val content =
+                                foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
+                            val hash = content.hashCode()
+                            ages[filePath]?.containsKey(hash)?.let { keyExists ->
+                                ages[filePath]?.put(
+                                    hash,
+                                    -(ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold - ElderBlocksFoldingSettings.instance.oldAge).toLong() * 1000
+                                )
                             }
                         }
-                    }, project)
-                    foldingModelsWithListener.add(editor.foldingModel)
-                }
+                    }
+
+                    override fun onFoldProcessingEnd() {
+                        foldProcessed[file.path] = true
+                        super.onFoldProcessingEnd()
+                    }
+                }, project)
+
             })
         }
     }
 
     fun fileClosed(source: FileEditorManager, file: VirtualFile) {
         ages.entries.removeIf { it.key == file.path }
+        foldProcessed.remove(file.path)
     }
 
     private fun getEditorForFile(fileEditorManager: FileEditorManager, file: VirtualFile): Editor? {
@@ -160,8 +164,8 @@ class EditorFileHandler {
                     foldingModelsMap.forEach { (foldingModel, foldingBlocks) ->
                         foldingModel.runBatchFoldingOperation {
                             foldingBlocks.forEach { foldRegion ->
-//                                foldRegion.isExpanded = false
-//                                foldRegion.placeholderText = " \uD83D\uDCA4 "
+                                foldRegion.isExpanded = false
+                                foldRegion.placeholderText = " \uD83D\uDCA4 "
                             }
                         }
                     }
