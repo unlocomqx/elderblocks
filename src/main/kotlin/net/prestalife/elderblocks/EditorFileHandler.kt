@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
 class EditorFileHandler {
     var project: Project
     var lastAgeUpdate: Long = 0
-    val ages = mutableMapOf<String, Long>()
+    val ages = mutableMapOf<String, MutableMap<Int, Long>>()
     private var scheduledTask: ScheduledFuture<*>? = null
 
     val foldingModelsWithListener = mutableListOf<FoldingModel>()
@@ -44,6 +44,7 @@ class EditorFileHandler {
     }
 
     fun fileOpened(source: FileEditorManager, file: VirtualFile) {
+        ages[file.path] = mutableMapOf()
         val editor = getEditorForFile(source, file)
         if (editor != null) {
             if (!foldingModelsWithListener.contains(editor.foldingModel)) {
@@ -55,9 +56,8 @@ class EditorFileHandler {
                             val content =
                                 foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
                             val hash = content.hashCode()
-                            val key = file.path + ":" + hash.toString()
-                            ages[key] = -oldAge
-                            println("Block unfolded in ${file.name}, age reset for key: $key")
+                            ages[file.path]?.put(hash, -oldAge)
+                            println("Block unfolded in ${file.name}, age reset for key: ${file.path}:${hash}")
                         }
                     }
                 }, project)
@@ -68,9 +68,9 @@ class EditorFileHandler {
                 val foldingBlocks = getFoldingBlocks(editor)
                 // Process folding blocks as needed
                 foldingBlocks.forEach { foldRegion ->
-                    if(foldRegion.isExpanded){
+                    if (foldRegion.isExpanded) {
                         val hash = getFoldingRegionHash(foldRegion)
-                        ages[file.path + ":" + hash.toString()] = 0
+                        ages[file.path]?.put(hash, 0)
                     }
                 }
             })
@@ -78,7 +78,7 @@ class EditorFileHandler {
     }
 
     fun fileClosed(source: FileEditorManager, file: VirtualFile) {
-        ages.entries.removeIf { it.key.startsWith(file.path) }
+        ages.entries.removeIf { it.key == file.path }
     }
 
     private fun getEditorForFile(fileEditorManager: FileEditorManager, file: VirtualFile): Editor? {
@@ -100,47 +100,46 @@ class EditorFileHandler {
         }
 
         val diff = now - lastAgeUpdate
-        ages.entries.map { ages[it.key] = ages[it.key]!! + diff }
+        ages.forEach { files ->
+            files.value.forEach { age ->
+                files.value[age.key] = age.value + diff
+            }
+        }
         lastAgeUpdate = now
 
         // get ages older than 3 seconds
-        val oldBlocks = ages.entries.filter { it.value > oldAge }
         val foldingModelsMap = mutableMapOf<FoldingModel, List<FoldRegion>>()
-
-        val blocksByFile = mutableMapOf<String, List<Int>>()
-        oldBlocks.forEach {
-            val parts = it.key.split(":")
-            val filePath = parts[0]
-            val hash = parts[1].toInt()
-            blocksByFile[filePath] = blocksByFile.getOrDefault(filePath, emptyList()) + hash
-        }
 
         ApplicationManager.getApplication().invokeAndWait {
             run {
                 WriteCommandAction.runWriteCommandAction(project) {
-                    blocksByFile.forEach { block ->
-                        val filePath = block.key
+                    ages.forEach { age ->
+                        val filePath = age.key
                         val foldingModel = getFoldingModel(filePath)
                         if (foldingModel == null) {
                             return@forEach
                         }
                         val foldingBlocks = getFoldingBlocksForFile(filePath)
-                        val seenContentKeys = mutableListOf<String>()
+                        val seenContentKeys = mutableListOf<Int>()
                         foldingBlocks.forEach { foldRegion ->
                             val contentHash = getFoldingRegionHash(foldRegion)
-                            val regionKey = "$filePath:$contentHash"
-                            seenContentKeys.add(regionKey)
-                            if (block.value.contains(contentHash)) {
-                                if (foldRegion.isExpanded) {
-                                    val foldingModelRegions = foldingModelsMap.getOrDefault(foldingModel, emptyList())
-                                    foldingModelsMap.put(foldingModel, foldingModelRegions + foldRegion)
-                                }
-                                ages.remove(regionKey)
-                                return@forEach
+                            seenContentKeys.add(contentHash)
+
+                            // if block is old and expanded
+                            if (age.value.getOrDefault(contentHash, 0L) > oldAge && foldRegion.isExpanded) {
+                                val foldingModelRegions = foldingModelsMap.getOrDefault(foldingModel, emptyList())
+                                foldingModelsMap.put(foldingModel, foldingModelRegions + foldRegion)
+                                ages[filePath]?.remove(contentHash)
+                            }
+
+                            // if block does not exist in ages, add it
+                            if (!age.value.contains(contentHash)) {
+                                ages[filePath]?.put(contentHash, -oldAge)
                             }
                         }
+
                         // cleanup
-                        ages.entries.removeIf { !seenContentKeys.contains(it.key) }
+                        ages[filePath]?.entries?.removeIf { !seenContentKeys.contains(it.key) }
                     }
 
                     foldingModelsMap.forEach { (foldingModel, foldingBlocks) ->
@@ -157,7 +156,7 @@ class EditorFileHandler {
     }
 
     private fun getFoldingModel(filePath: String): FoldingModel? {
-        val file = VirtualFileManager.getInstance().findFileByUrl("file://$filePath");
+        val file = VirtualFileManager.getInstance().findFileByUrl("file://$filePath")
         if (file != null) {
             val editor = getEditorForFile(FileEditorManager.getInstance(project), file)
             if (editor != null) {
@@ -174,7 +173,7 @@ class EditorFileHandler {
     }
 
     private fun getFoldingBlocksForFile(filePath: String): List<FoldRegion> {
-        val file = VirtualFileManager.getInstance().findFileByUrl("file://$filePath");
+        val file = VirtualFileManager.getInstance().findFileByUrl("file://$filePath")
         if (file != null) {
             val editor = getEditorForFile(FileEditorManager.getInstance(project), file)
             if (editor != null) {
