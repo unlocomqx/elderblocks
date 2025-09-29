@@ -154,6 +154,7 @@ class EditorFileHandler {
                         foldingModel.runBatchFoldingOperation {
                             foldingBlocks.forEach { foldRegion ->
                                 foldRegion.isExpanded = false
+                                foldRegion.placeholderText = " \uD83D\uDCA4 "
                             }
                         }
                     }
