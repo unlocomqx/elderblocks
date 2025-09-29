@@ -25,5 +25,7 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
         <postStartupActivity implementation="net.prestalife.elderblocks.ElderblocksPostStartupActivity"/>
+        <codeFoldingOptionsProvider instance="net.prestalife.elderblocks.ElderblocksCodeFoldingOptionsProvider"/>
+        <applicationService serviceImplementation="net.prestalife.elderblocks.ElderBlocksFoldingSettings"/>
     </extensions>
 </idea-plugin>
