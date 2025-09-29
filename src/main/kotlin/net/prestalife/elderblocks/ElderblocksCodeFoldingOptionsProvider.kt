@@ -11,6 +11,8 @@ import javax.swing.JComponent
 
 class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
     private var ageField: String = ElderBlocksFoldingSettings.instance.oldAge.toString()
+    private var reFoldAfterManualUnfoldField: String = ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold.toString()
+    private var reFoldAfterEditField: String = ElderBlocksFoldingSettings.instance.reFoldAfterEdit.toString()
 
     override fun createComponent(): JComponent {
         return panel {
@@ -18,20 +20,41 @@ class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
                 row("Age threshold (seconds):") {
                     textField()
                         .bindText(::ageField)
-                        .comment("Blocks will be folded after this many seconds of inactivity")
+                        .comment("Blocks will be folded after this many seconds of inactivity (default: 60 seconds)")
+                }
+
+                row("Fold blocks that I manually unfolded after (seconds):") {
+                    textField()
+                        .bindText(::reFoldAfterManualUnfoldField)
+                        .comment("Blocks will be folded after this many seconds of inactivity (default: 90 seconds, 0 means never)")
+                }
+
+                row("Fold blocks that I edited after (seconds):") {
+                    textField()
+                        .bindText(::reFoldAfterEditField)
+                        .comment("Blocks will be folded after this many seconds of inactivity (default: 120 seconds, 0 means never)")
                 }
             }
         }
     }
 
     override fun isModified(): Boolean {
-        return ageField != ElderBlocksFoldingSettings.instance.oldAge.toString()
+        return ageField != ElderBlocksFoldingSettings.instance.oldAge.toString() ||
+               reFoldAfterManualUnfoldField != ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold.toString() ||
+               reFoldAfterEditField != ElderBlocksFoldingSettings.instance.reFoldAfterEdit.toString()
     }
 
     override fun apply() {
-        ElderBlocksFoldingSettings.instance.oldAge = ageField.toIntOrNull() ?: 30
+        ElderBlocksFoldingSettings.instance.oldAge = ageField.toIntOrNull() ?: 60
+        ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold = reFoldAfterManualUnfoldField.toIntOrNull() ?: 90
+        ElderBlocksFoldingSettings.instance.reFoldAfterEdit = reFoldAfterEditField.toIntOrNull() ?: 0
     }
 
+    override fun reset() {
+        ageField = ElderBlocksFoldingSettings.instance.oldAge.toString()
+        reFoldAfterManualUnfoldField = ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold.toString()
+        reFoldAfterEditField = ElderBlocksFoldingSettings.instance.reFoldAfterEdit.toString()
+    }
 }
 
 @State(name = "ElderBlocksFoldingSettings", storages = [(Storage("elderblocks.xml"))])
@@ -39,6 +62,8 @@ class ElderBlocksFoldingSettings : PersistentStateComponent<ElderBlocksFoldingSe
 
     data class State(
         var oldAge: Int = 60,
+        var reFoldAfterManualUnfold: Int = 90,
+        var reFoldAfterEdit: Int = 0
     )
 
     private var state = State()
@@ -56,6 +81,18 @@ class ElderBlocksFoldingSettings : PersistentStateComponent<ElderBlocksFoldingSe
         get() = state.oldAge
         set(value) {
             state.oldAge = value
+        }
+
+    var reFoldAfterManualUnfold: Int
+        get() = state.reFoldAfterManualUnfold
+        set(value) {
+            state.reFoldAfterManualUnfold = value
+        }
+
+    var reFoldAfterEdit: Int
+        get() = state.reFoldAfterEdit
+        set(value) {
+            state.reFoldAfterEdit = value
         }
 
     companion object {
