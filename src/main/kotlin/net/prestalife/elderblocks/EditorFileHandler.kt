@@ -44,8 +44,9 @@ class EditorFileHandler {
     }
 
     fun fileOpened(source: FileEditorManager, file: VirtualFile) {
+        val fileEditor = source.getSelectedEditor(file)
         val editor = getEditorForFile(source, file)
-        if (editor != null) {
+        if (editor != null && fileEditor != null) {
             ApplicationManager.getApplication().runReadAction(Runnable {
                 ages[file.path] = mutableMapOf()
                 val foldingBlocks = getFoldingBlocks(editor)
@@ -95,13 +96,12 @@ class EditorFileHandler {
                         foldProcessed[file.path] = true
                         super.onFoldProcessingEnd()
                     }
-                }, project)
-
+                }, fileEditor)
             })
         }
     }
 
-    fun fileClosed(source: FileEditorManager, file: VirtualFile) {
+    fun fileClosed(file: VirtualFile) {
         ages.entries.removeIf { it.key == file.path }
         foldProcessed.remove(file.path)
     }
@@ -149,7 +149,7 @@ class EditorFileHandler {
                         foldingBlocks.forEach { foldRegion ->
                             val content = getFoldingRegionContent(foldRegion)
                             val contentHash = content.hashCode()
-                            if(settings.minBlockLines > 0 && content.lines().count() < settings.minBlockLines) {
+                            if (settings.minBlockLines > 0 && content.lines().count() < settings.minBlockLines) {
                                 return@forEach
                             }
                             if (!settings.foldTopLevelBlocks && isTopLevelBlock(foldingBlocks, foldRegion)) {
@@ -231,10 +231,5 @@ class EditorFileHandler {
             }
         }
         return emptyList()
-    }
-
-    // Call this method to clean up resources when the handler is no longer needed
-    fun dispose() {
-        scheduledTask?.cancel(true)
     }
 }
