@@ -60,7 +60,7 @@ class EditorFileHandler {
                 // Add folding listener to detect when blocks are unfolded
                 (editor as EditorEx).foldingModel.addListener(object : FoldingListener {
                     override fun onFoldRegionStateChange(foldRegion: FoldRegion) {
-                        if(settings.reFoldAfterManualUnfold == 0) {
+                        if (settings.reFoldAfterManualUnfold == 0) {
                             return
                         }
                         val filePath = foldRegion.editor.virtualFile.path
@@ -147,8 +147,12 @@ class EditorFileHandler {
                         val foldingBlocks = getFoldingBlocksForFile(filePath)
                         val seenContentKeys = mutableListOf<Int>()
                         foldingBlocks.forEach { foldRegion ->
-                            val contentHash = getFoldingRegionHash(foldRegion)
-                            if(!settings.foldTopLevelBlocks && isTopLevelBlock(foldingBlocks, foldRegion)) {
+                            val content = getFoldingRegionContent(foldRegion)
+                            val contentHash = content.hashCode()
+                            if(settings.minBlockLines > 0 && content.lines().count() < settings.minBlockLines) {
+                                return@forEach
+                            }
+                            if (!settings.foldTopLevelBlocks && isTopLevelBlock(foldingBlocks, foldRegion)) {
                                 return@forEach
                             }
                             seenContentKeys.add(contentHash)
@@ -209,9 +213,12 @@ class EditorFileHandler {
         return null
     }
 
+    private fun getFoldingRegionContent(foldRegion: FoldRegion): String {
+        return foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
+    }
+
     private fun getFoldingRegionHash(foldRegion: FoldRegion): Int {
-        val content =
-            foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
+        val content = getFoldingRegionContent(foldRegion)
         return content.hashCode()
     }
 
