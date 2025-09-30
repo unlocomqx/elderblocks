@@ -148,6 +148,9 @@ class EditorFileHandler {
                         val seenContentKeys = mutableListOf<Int>()
                         foldingBlocks.forEach { foldRegion ->
                             val contentHash = getFoldingRegionHash(foldRegion)
+                            if(!settings.foldTopLevelBlocks && isTopLevelBlock(foldingBlocks, foldRegion)) {
+                                return@forEach
+                            }
                             seenContentKeys.add(contentHash)
 
                             // if block is old and expanded
@@ -186,6 +189,13 @@ class EditorFileHandler {
                 }
             }
         }
+    }
+
+    private fun isTopLevelBlock(
+        foldingBlocks: List<FoldRegion>,
+        foldRegion: FoldRegion
+    ): Boolean {
+        return foldingBlocks.none { it.startOffset < foldRegion.startOffset && it.endOffset > foldRegion.endOffset }
     }
 
     private fun getFoldingModel(filePath: String): FoldingModel? {

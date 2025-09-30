@@ -6,6 +6,7 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.builder.selected
 import com.intellij.ui.dsl.builder.text
 import javax.swing.JComponent
 
@@ -13,6 +14,7 @@ class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
     private var oldAge: Int = ElderBlocksFoldingSettings.instance.oldAge
     private var reFoldAfterManualUnfold: Int = ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold
     private var reFoldAfterEdit: Int = ElderBlocksFoldingSettings.instance.reFoldAfterEdit
+    private var foldTopLevelBlocks: Boolean = ElderBlocksFoldingSettings.instance.foldTopLevelBlocks
     override fun createComponent(): JComponent {
         return panel {
             group("Elder Blocks") {
@@ -42,6 +44,14 @@ class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
                         }
                         .comment("Blocks will be folded after this many seconds of inactivity (default: 120 seconds, 0 means never)")
                 }
+
+                row("Fold top-level blocks:") {
+                    checkBox("Fold top-level blocks")
+                        .selected(foldTopLevelBlocks)
+                        .onChanged {
+                            foldTopLevelBlocks = it.isSelected
+                        }
+                }
             }
         }
     }
@@ -49,19 +59,22 @@ class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
     override fun isModified(): Boolean {
         return oldAge != ElderBlocksFoldingSettings.instance.oldAge ||
                 reFoldAfterManualUnfold != ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold ||
-                reFoldAfterEdit != ElderBlocksFoldingSettings.instance.reFoldAfterEdit
+                reFoldAfterEdit != ElderBlocksFoldingSettings.instance.reFoldAfterEdit ||
+                foldTopLevelBlocks != ElderBlocksFoldingSettings.instance.foldTopLevelBlocks
     }
 
     override fun apply() {
         ElderBlocksFoldingSettings.instance.oldAge = oldAge
         ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold = reFoldAfterManualUnfold
         ElderBlocksFoldingSettings.instance.reFoldAfterEdit = reFoldAfterEdit
+        ElderBlocksFoldingSettings.instance.foldTopLevelBlocks = foldTopLevelBlocks
     }
 
     override fun reset() {
         oldAge = ElderBlocksFoldingSettings.instance.oldAge
         reFoldAfterManualUnfold = ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold
         reFoldAfterEdit = ElderBlocksFoldingSettings.instance.reFoldAfterEdit
+        foldTopLevelBlocks = ElderBlocksFoldingSettings.instance.foldTopLevelBlocks
     }
 }
 
@@ -71,7 +84,8 @@ class ElderBlocksFoldingSettings : PersistentStateComponent<ElderBlocksFoldingSe
     data class State(
         var oldAge: Int = 60,
         var reFoldAfterManualUnfold: Int = 90,
-        var reFoldAfterEdit: Int = 0
+        var reFoldAfterEdit: Int = 0,
+        var foldTopLevelBlocks: Boolean = false
     )
 
     private var state = State()
@@ -101,6 +115,12 @@ class ElderBlocksFoldingSettings : PersistentStateComponent<ElderBlocksFoldingSe
         get() = state.reFoldAfterEdit
         set(value) {
             state.reFoldAfterEdit = value
+        }
+
+    var foldTopLevelBlocks: Boolean
+        get() = state.foldTopLevelBlocks
+        set(value) {
+            state.foldTopLevelBlocks = value
         }
 
     companion object {
