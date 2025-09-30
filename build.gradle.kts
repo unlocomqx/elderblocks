@@ -1,5 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+fun properties(key: String) = project.findProperty(key).toString()
+
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.1.0"
@@ -7,7 +9,7 @@ plugins {
 }
 
 group = "net.prestalife"
-version = "1.0-SNAPSHOT"
+version = properties("pluginVersion")
 
 repositories {
     mavenCentral()
@@ -48,5 +50,20 @@ tasks {
     }
     withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
         compilerOptions.jvmTarget.set(JvmTarget.JVM_21)
+    }
+
+    patchPluginXml {
+        sinceBuild.set(properties("pluginSinceBuild"))
+        untilBuild.set(properties("pluginUntilBuild"))
+    }
+
+    signPlugin {
+        certificateChain.set(System.getenv("CERTIFICATE_CHAIN"))
+        privateKey.set(System.getenv("PRIVATE_KEY"))
+        password.set(System.getenv("PRIVATE_KEY_PASSWORD"))
+    }
+
+    publishPlugin {
+        token.set(System.getenv("PUBLISH_TOKEN"))
     }
 }

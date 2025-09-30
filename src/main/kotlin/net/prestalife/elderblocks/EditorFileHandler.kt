@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit
 
 class EditorFileHandler {
     var project: Project
+    val settings = ElderBlocksFoldingSettings.instance
     var lastAgeUpdate: Long = 0
     val ages = mutableMapOf<String, MutableMap<Int, Long>>()
     private var scheduledTask: ScheduledFuture<*>? = null
@@ -59,22 +60,35 @@ class EditorFileHandler {
                 // Add folding listener to detect when blocks are unfolded
                 (editor as EditorEx).foldingModel.addListener(object : FoldingListener {
                     override fun onFoldRegionStateChange(foldRegion: FoldRegion) {
+                        if(settings.reFoldAfterManualUnfold == 0) {
+                            return
+                        }
                         val filePath = foldRegion.editor.virtualFile.path
-                        if(filePath != file.path || foldProcessed[filePath] != true || !ages.containsKey(filePath)) {
+                        if (filePath != file.path || foldProcessed[filePath] != true || !ages.containsKey(filePath)) {
                             return
                         }
                         if (foldRegion.isExpanded) {
-                            // Block was unfolded, reset its age
-                            val content =
-                                foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
-                            val hash = content.hashCode()
-                            ages[filePath]?.containsKey(hash)?.let { keyExists ->
-                                ages[filePath]?.put(
-                                    hash,
-                                    -(ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold - ElderBlocksFoldingSettings.instance.oldAge).toLong() * 1000
-                                )
+                            getFoldRegionParents(foldRegion).forEach { region ->
+                                val content =
+                                    foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
+                                val hash = content.hashCode()
+                                ages[filePath]?.containsKey(hash)?.let { keyExists ->
+                                    ages[filePath]?.put(
+                                        hash,
+                                        -(settings.reFoldAfterManualUnfold - settings.oldAge).toLong() * 1000
+                                    )
+                                }
                             }
                         }
+                    }
+
+                    private fun getFoldRegionParents(foldRegion: FoldRegion): List<FoldRegion> {
+                        val filePath = foldRegion.editor.virtualFile.path
+                        val parents = mutableListOf(foldRegion)
+                        val foldRegions = getFoldingBlocksForFile(filePath)
+                        foldRegions.filter { it.startOffset < foldRegion.startOffset && it.endOffset > foldRegion.endOffset }
+                            .forEach { parents.add(it) }
+                        return parents
                     }
 
                     override fun onFoldProcessingEnd() {
@@ -137,11 +151,11 @@ class EditorFileHandler {
                             seenContentKeys.add(contentHash)
 
                             // if block is old and expanded
-                            if (age.value.getOrDefault(
+                            if (foldRegion.isExpanded &&
+                                age.value.getOrDefault(
                                     contentHash,
                                     0L
-                                ) > ElderBlocksFoldingSettings.instance.oldAge * 1000 &&
-                                foldRegion.isExpanded
+                                ) > settings.oldAge * 1000
                             ) {
                                 val foldingModelRegions = foldingModelsMap.getOrDefault(foldingModel, emptyList())
                                 foldingModelsMap.put(foldingModel, foldingModelRegions + foldRegion)
@@ -149,10 +163,10 @@ class EditorFileHandler {
                             }
 
                             // if block does not exist in ages, add it
-                            if (!age.value.contains(contentHash)) {
+                            if (!age.value.contains(contentHash) && settings.reFoldAfterEdit != 0) {
                                 ages[filePath]?.put(
                                     contentHash,
-                                    -(ElderBlocksFoldingSettings.instance.reFoldAfterEdit - ElderBlocksFoldingSettings.instance.oldAge).toLong() * 1000
+                                    -(settings.reFoldAfterEdit - settings.oldAge).toLong() * 1000
                                 )
                             }
                         }
