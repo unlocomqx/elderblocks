@@ -13,8 +13,10 @@
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
     <description><![CDATA[
-    Fold unused code blocks for an easier code navigation and improved code readability.<br>
-    This plugin helps developers to focus on the essential parts of their code by collapsing unnecessary code blocks automatically.
+    Fold unused code blocks for easier code navigation and improved code readability.<br>
+    This plugin helps developers to focus on the essential parts of their code by collapsing unnecessary code blocks automatically.<br><br>
+    Check the <strong>Code Folding</strong> section to configure the plugin. <br>
+    <pre>Settings | Editor | General | Code Folding.</pre>
   ]]></description>
 
     <!-- Product and plugin compatibility requirements.
