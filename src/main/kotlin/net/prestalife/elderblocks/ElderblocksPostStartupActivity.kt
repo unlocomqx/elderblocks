@@ -15,7 +15,7 @@ class ElderblocksPostStartupActivity : ProjectActivity {
             }
 
             override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
-                fileHandler.fileClosed(source, file)
+                fileHandler.fileClosed(file)
             }
         }
 
