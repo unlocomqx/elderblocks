@@ -13,6 +13,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.util.concurrency.AppExecutorUtil
+import kotlinx.coroutines.Runnable
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
@@ -135,7 +136,7 @@ class EditorFileHandler {
         // get ages older than 3 seconds
         val foldingModelsMap = mutableMapOf<FoldingModel, List<FoldRegion>>()
 
-        ApplicationManager.getApplication().invokeAndWait {
+        ApplicationManager.getApplication().invokeLater (Runnable{
             run {
                 WriteCommandAction.runWriteCommandAction(project) {
                     ages.forEach { age ->
@@ -192,7 +193,7 @@ class EditorFileHandler {
                     }
                 }
             }
-        }
+        }, project.disposed)
     }
 
     private fun isTopLevelBlock(
