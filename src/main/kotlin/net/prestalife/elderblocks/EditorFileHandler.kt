@@ -2,6 +2,7 @@ package net.prestalife.elderblocks
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.FoldRegion
 import com.intellij.openapi.editor.FoldingModel
@@ -13,7 +14,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.util.concurrency.AppExecutorUtil
-import kotlinx.coroutines.Runnable
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
@@ -28,6 +28,8 @@ class EditorFileHandler {
     val foldProcessed = mutableMapOf<String, Boolean>()
 
     val delaySeconds = 5L
+
+    val log = Logger.getInstance(EditorFileHandler::class.java)
 
     constructor(project: Project) {
         this.project = project
@@ -120,6 +122,7 @@ class EditorFileHandler {
     }
 
     private fun foldOldBlocks() {
+        log.info("Folding old blocks")
         val now = System.currentTimeMillis()
         if (lastAgeUpdate == 0L) {
             lastAgeUpdate = now
@@ -158,19 +161,21 @@ class EditorFileHandler {
                             }
                             seenContentKeys.add(contentHash)
 
-                            // if block is old and expanded
+                            // if the block is old and expanded
+                            val regionAge = age.value.getOrDefault(
+                                contentHash,
+                                0L
+                            )
                             if (foldRegion.isExpanded &&
-                                age.value.getOrDefault(
-                                    contentHash,
-                                    0L
-                                ) > settings.oldAge * 1000
+                                regionAge > settings.oldAge * 1000
                             ) {
                                 val foldingModelRegions = foldingModelsMap.getOrDefault(foldingModel, emptyList())
                                 foldingModelsMap.put(foldingModel, foldingModelRegions + foldRegion)
                                 ages[filePath]?.remove(contentHash)
+                                log.debug("Folding block at ${foldRegion.startOffset} to ${foldRegion.endOffset} with age $regionAge > ${settings.oldAge * 1000}")
                             }
 
-                            // if block does not exist in ages, add it
+                            // if the block does not exist in ages, add it
                             if (!age.value.contains(contentHash) && settings.reFoldAfterEdit != 0) {
                                 ages[filePath]?.put(
                                     contentHash,
