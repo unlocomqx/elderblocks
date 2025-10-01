@@ -76,12 +76,16 @@ class EditorFileHandler {
                                 val content =
                                     foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
                                 val hash = content.hashCode()
-                                ages[filePath]?.containsKey(hash)?.let { keyExists ->
-                                    ages[filePath]?.put(
-                                        hash,
-                                        -(settings.reFoldAfterManualUnfold - settings.oldAge).toLong() * 1000
-                                    )
+                                val lines = content.lines()
+                                if(settings.minBlockLines > 0 && lines.count() < settings.minBlockLines) {
+                                    return@forEach
                                 }
+                                if (!settings.foldTopLevelBlocks && isTopLevelBlock(foldingBlocks, foldRegion)) {
+                                    return@forEach
+                                }
+                                val age = -(settings.reFoldAfterManualUnfold - settings.oldAge).toLong() * 1000
+                                ages[filePath]?.put(hash, age)
+                                log.debug("Settings age of ${foldRegion.startOffset} to ${foldRegion.endOffset} to $age")
                             }
                         }
                     }
@@ -139,9 +143,12 @@ class EditorFileHandler {
         // get ages older than 3 seconds
         val foldingModelsMap = mutableMapOf<FoldingModel, List<FoldRegion>>()
 
-        ApplicationManager.getApplication().invokeLater (Runnable{
+        val debugStart = System.currentTimeMillis()
+        log.debug("Invoke later started at 0")
+        ApplicationManager.getApplication().invokeLater(Runnable {
             run {
                 WriteCommandAction.runWriteCommandAction(project) {
+                    log.debug("Invoke later finished at ${System.currentTimeMillis() - debugStart}")
                     ages.forEach { age ->
                         val filePath = age.key
                         val foldingModel = getFoldingModel(filePath)
@@ -190,6 +197,7 @@ class EditorFileHandler {
 
                     foldingModelsMap.forEach { (foldingModel, foldingBlocks) ->
                         foldingModel.runBatchFoldingOperation {
+                            log.debug("Folding ${foldingBlocks.size} blocks at ${System.currentTimeMillis() - debugStart}")
                             foldingBlocks.forEach { foldRegion ->
                                 foldRegion.isExpanded = false
                                 foldRegion.placeholderText = " \uD83D\uDCA4 "
