@@ -1,8 +1,13 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Run Plugin" type="GradleRunConfiguration" factoryName="Gradle" show_console_on_std_err="true" show_console_on_std_out="true">
-    <output_file path="$USER_HOME$/Downloads/elderblocks.log" is_save="true" />
-    <log_file alias="idea.log" path="$PROJECT_DIR$/build/idea-sandbox/system/log/idea.log" />
+  <configuration default="false" name="Run Plugin" type="GradleRunConfiguration" factoryName="Gradle">
+    <output_file path="$USER_HOME$/Downloads/elderblocks.log" />
+    <log_file alias="idea.log" path="$PROJECT_DIR$/build/idea-sandbox/PS-2025.1/log/idea.log" />
     <ExternalSystemSettings>
+      <option name="env">
+        <map>
+          <entry key="DEBUG" value="true" />
+        </map>
+      </option>
       <option name="executionName" />
       <option name="externalProjectPath" value="$PROJECT_DIR$" />
       <option name="externalSystemIdString" value="GRADLE" />
