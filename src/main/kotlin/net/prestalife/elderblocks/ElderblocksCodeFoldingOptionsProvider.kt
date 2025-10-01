@@ -49,7 +49,7 @@ class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
                         .comment("Delay before folding edited blocks (default: 120 seconds, 0 means never)")
                 }
 
-                row("Fold top-level blocks:") {
+                row(" ") {
                     checkBox("Fold top-level blocks")
                         .selected(foldTopLevelBlocks)
                         .onChanged {
