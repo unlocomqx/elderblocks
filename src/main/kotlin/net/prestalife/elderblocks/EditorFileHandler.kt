@@ -77,7 +77,7 @@ class EditorFileHandler {
                                     foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
                                 val hash = content.hashCode()
                                 val lines = content.lines()
-                                if(settings.minBlockLines > 0 && lines.count() < settings.minBlockLines) {
+                                if (settings.minBlockLines > 0 && lines.count() < settings.minBlockLines) {
                                     return@forEach
                                 }
                                 if (!settings.foldTopLevelBlocks && isTopLevelBlock(foldingBlocks, foldRegion)) {
@@ -158,12 +158,19 @@ class EditorFileHandler {
                         val foldingBlocks = getFoldingBlocksForFile(filePath)
                         val seenContentKeys = mutableListOf<Int>()
                         foldingBlocks.forEach { foldRegion ->
+                            val cursorPosition = getCursorPosition(foldRegion.editor)
                             val content = getFoldingRegionContent(foldRegion)
                             val contentHash = content.hashCode()
                             if (settings.minBlockLines > 0 && content.lines().count() < settings.minBlockLines) {
+                                ages[filePath]?.remove(contentHash)
                                 return@forEach
                             }
                             if (!settings.foldTopLevelBlocks && isTopLevelBlock(foldingBlocks, foldRegion)) {
+                                ages[filePath]?.remove(contentHash)
+                                return@forEach
+                            }
+                            if (!settings.foldFocusedBlocks && cursorPosition != null && cursorPosition > foldRegion.startOffset && cursorPosition < foldRegion.endOffset) {
+                                ages[filePath]?.remove(contentHash)
                                 return@forEach
                             }
                             seenContentKeys.add(contentHash)
@@ -245,5 +252,9 @@ class EditorFileHandler {
             }
         }
         return emptyList()
+    }
+
+    private fun getCursorPosition(editor: Editor): Int? {
+        return editor.caretModel.offset
     }
 }
