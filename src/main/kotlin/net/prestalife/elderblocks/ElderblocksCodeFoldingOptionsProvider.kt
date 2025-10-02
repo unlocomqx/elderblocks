@@ -15,6 +15,7 @@ class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
     private var reFoldAfterManualUnfold: Int = ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold
     private var reFoldAfterEdit: Int = ElderBlocksFoldingSettings.instance.reFoldAfterEdit
     private var foldTopLevelBlocks: Boolean = ElderBlocksFoldingSettings.instance.foldTopLevelBlocks
+    private var foldFocusedBlocks: Boolean = ElderBlocksFoldingSettings.instance.foldFocusedBlocks
     private var minBlockLines: Int = ElderBlocksFoldingSettings.instance.minBlockLines
     override fun createComponent(): JComponent {
         return panel {
@@ -57,6 +58,15 @@ class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
                         }
                 }
 
+                row(" ") {
+                    checkBox("Fold focused blocks")
+                        .selected(foldFocusedBlocks)
+                        .onChanged {
+                            foldFocusedBlocks = it.isSelected
+                        }
+                        .comment("Allow folding of blocks that contain the cursor")
+                }
+
                 row("Minimum lines:") {
                     intTextField()
                         .text(minBlockLines.toString())
@@ -74,6 +84,7 @@ class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
                 reFoldAfterManualUnfold != ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold ||
                 reFoldAfterEdit != ElderBlocksFoldingSettings.instance.reFoldAfterEdit ||
                 foldTopLevelBlocks != ElderBlocksFoldingSettings.instance.foldTopLevelBlocks ||
+                foldFocusedBlocks != ElderBlocksFoldingSettings.instance.foldFocusedBlocks ||
                 minBlockLines != ElderBlocksFoldingSettings.instance.minBlockLines
     }
 
@@ -83,6 +94,7 @@ class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
         ElderBlocksFoldingSettings.instance.reFoldAfterEdit = reFoldAfterEdit
           ElderBlocksFoldingSettings.instance.minBlockLines = minBlockLines
         ElderBlocksFoldingSettings.instance.foldTopLevelBlocks = foldTopLevelBlocks
+        ElderBlocksFoldingSettings.instance.foldFocusedBlocks = foldFocusedBlocks
     }
 
     override fun reset() {
@@ -90,6 +102,7 @@ class ElderblocksCodeFoldingOptionsProvider : CodeFoldingOptionsProvider {
         reFoldAfterManualUnfold = ElderBlocksFoldingSettings.instance.reFoldAfterManualUnfold
         reFoldAfterEdit = ElderBlocksFoldingSettings.instance.reFoldAfterEdit
         foldTopLevelBlocks = ElderBlocksFoldingSettings.instance.foldTopLevelBlocks
+        foldFocusedBlocks = ElderBlocksFoldingSettings.instance.foldFocusedBlocks
         minBlockLines = ElderBlocksFoldingSettings.instance.minBlockLines
     }
 }
@@ -102,6 +115,7 @@ class ElderBlocksFoldingSettings : PersistentStateComponent<ElderBlocksFoldingSe
         var reFoldAfterManualUnfold: Int = 90,
         var reFoldAfterEdit: Int = 0,
         var foldTopLevelBlocks: Boolean = false,
+        var foldFocusedBlocks: Boolean = false,
         var minBlockLines: Int = 5
     )
 
@@ -138,6 +152,12 @@ class ElderBlocksFoldingSettings : PersistentStateComponent<ElderBlocksFoldingSe
         get() = state.foldTopLevelBlocks
         set(value) {
             state.foldTopLevelBlocks = value
+        }
+
+    var foldFocusedBlocks: Boolean
+        get() = state.foldFocusedBlocks
+        set(value) {
+            state.foldFocusedBlocks = value
         }
 
     var minBlockLines: Int
