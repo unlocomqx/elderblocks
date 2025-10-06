@@ -27,7 +27,6 @@ class EditorFileHandler {
     val settings = ElderBlocksFoldingSettings.instance
     var lastAgeUpdate: Long = 0
     val ages = mutableMapOf<String, MutableMap<Int, Long>>()
-    val hashMap = mutableMapOf<String, String>()
     private var scheduledTask: ScheduledFuture<*>? = null
 
     val foldProcessed = mutableMapOf<String, Boolean>()
@@ -118,7 +117,7 @@ class EditorFileHandler {
                             val position = event.editor.caretModel.offset
                             println("Caret moved to $position")
                         }
-                    }, fileEditor);
+                    }, fileEditor)
             }
         }
     }
