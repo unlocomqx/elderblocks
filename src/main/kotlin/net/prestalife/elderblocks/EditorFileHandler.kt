@@ -19,6 +19,7 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.util.concurrency.AppExecutorUtil
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
+import kotlin.math.min
 
 data class Result(val hash: Int, val lines: Int)
 
@@ -91,15 +92,6 @@ class EditorFileHandler {
                         }
                     }
 
-                    private fun getFoldRegionParents(foldRegion: FoldRegion): List<FoldRegion> {
-                        val filePath = foldRegion.editor.virtualFile.path
-                        val parents = mutableListOf(foldRegion)
-                        val foldRegions = getFoldingBlocksForFile(filePath)
-                        foldRegions.filter { it.startOffset < foldRegion.startOffset && it.endOffset > foldRegion.endOffset }
-                            .forEach { parents.add(it) }
-                        return parents
-                    }
-
                     override fun onFoldProcessingEnd() {
                         foldProcessed[file.path] = true
                         super.onFoldProcessingEnd()
@@ -115,6 +107,22 @@ class EditorFileHandler {
                                 return
                             }
                             val position = event.editor.caretModel.offset
+                            getFoldingBlocksForFile(filePath).forEach { region ->
+                                if (!region.isExpanded) {
+                                    return@forEach
+                                }
+                                if (region.startOffset <= position && region.endOffset >= position) {
+                                    val (hash) = getFoldingRegionHash(region)
+                                    if (ages[filePath]?.containsKey(hash) == true) {
+                                        val age =
+                                            -(settings.reFoldAfterManualUnfold - settings.oldAge).toLong() * 1000
+                                        val currentAge = ages[filePath]?.get(hash) ?: 0L
+                                        ages[filePath]?.put(hash, min(currentAge, age))
+                                        log.debug("Setting age of ${region.startOffset} to ${region.endOffset} from ${currentAge / 1000} to ${age / 1000}")
+                                    }
+                                }
+                            }
+
                             println("Caret moved to $position")
                         }
                     }, fileEditor)
@@ -262,6 +270,15 @@ class EditorFileHandler {
             }
         }
         return emptyList()
+    }
+
+    private fun getFoldRegionParents(foldRegion: FoldRegion): List<FoldRegion> {
+        val filePath = foldRegion.editor.virtualFile.path
+        val parents = mutableListOf(foldRegion)
+        val foldRegions = getFoldingBlocksForFile(filePath)
+        foldRegions.filter { it.startOffset < foldRegion.startOffset && it.endOffset > foldRegion.endOffset }
+            .forEach { parents.add(it) }
+        return parents
     }
 
     private fun getCursorPosition(editor: Editor): Int? {
