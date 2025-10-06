@@ -4,8 +4,11 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.FoldRegion
 import com.intellij.openapi.editor.FoldingModel
+import com.intellij.openapi.editor.event.CaretEvent
+import com.intellij.openapi.editor.event.CaretListener
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.ex.FoldingListener
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -14,16 +17,17 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.util.concurrency.AppExecutorUtil
-import java.io.File
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
+data class Result(val hash: Int, val lines: Int)
 
 class EditorFileHandler {
     var project: Project
     val settings = ElderBlocksFoldingSettings.instance
     var lastAgeUpdate: Long = 0
     val ages = mutableMapOf<String, MutableMap<Int, Long>>()
+    val hashMap = mutableMapOf<String, String>()
     private var scheduledTask: ScheduledFuture<*>? = null
 
     val foldProcessed = mutableMapOf<String, Boolean>()
@@ -57,7 +61,7 @@ class EditorFileHandler {
                 // Process folding blocks as needed
                 foldingBlocks.forEach { foldRegion ->
                     if (foldRegion.isExpanded) {
-                        val hash = getFoldingRegionHash(foldRegion)
+                        val (hash) = getFoldingRegionHash(foldRegion)
                         ages[file.path]?.put(hash, 0)
                     }
                 }
@@ -74,11 +78,8 @@ class EditorFileHandler {
                         }
                         if (foldRegion.isExpanded) {
                             getFoldRegionParents(foldRegion).forEach { region ->
-                                val content =
-                                    foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
-                                val hash = content.hashCode()
-                                val lines = content.lines()
-                                if (settings.minBlockLines > 0 && lines.count() < settings.minBlockLines) {
+                                val (hash, lines) = getFoldingRegionHash(foldRegion)
+                                if (settings.minBlockLines > 0 && lines < settings.minBlockLines) {
                                     return@forEach
                                 }
                                 if (!settings.foldTopLevelBlocks && isTopLevelBlock(foldingBlocks, foldRegion)) {
@@ -105,6 +106,19 @@ class EditorFileHandler {
                         super.onFoldProcessingEnd()
                     }
                 }, fileEditor)
+
+                EditorFactory.getInstance()
+                    .eventMulticaster
+                    .addCaretListener(object : CaretListener {
+                        override fun caretPositionChanged(event: CaretEvent) {
+                            val filePath = event.editor.virtualFile.path
+                            if (filePath != file.path) {
+                                return
+                            }
+                            val position = event.editor.caretModel.offset
+                            println("Caret moved to $position")
+                        }
+                    }, fileEditor);
             }
         }
     }
@@ -235,9 +249,9 @@ class EditorFileHandler {
         return foldRegion.document.text.substring(foldRegion.startOffset, foldRegion.endOffset)
     }
 
-    private fun getFoldingRegionHash(foldRegion: FoldRegion): Int {
+    private fun getFoldingRegionHash(foldRegion: FoldRegion): Result {
         val content = getFoldingRegionContent(foldRegion)
-        return content.hashCode()
+        return Result(content.hashCode(), content.lines().count())
     }
 
     private fun getFoldingBlocksForFile(filePath: String): List<FoldRegion> {
