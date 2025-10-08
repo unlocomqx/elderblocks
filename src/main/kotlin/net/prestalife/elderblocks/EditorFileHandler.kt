@@ -102,7 +102,11 @@ class EditorFileHandler {
                     .eventMulticaster
                     .addCaretListener(object : CaretListener {
                         override fun caretPositionChanged(event: CaretEvent) {
-                            val filePath = event.editor.virtualFile.path
+                            val virtualFile = event.editor.virtualFile
+                            if (virtualFile == null) {
+                                return
+                            }
+                            val filePath = virtualFile.path
                             if (filePath != file.path) {
                                 return
                             }
