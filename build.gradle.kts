@@ -22,11 +22,11 @@ repositories {
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
     intellijPlatform {
-        create("PS", "2025.1")
+        create("PS", "2025.3")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
 
         // Add necessary plugin dependencies for compilation here, example:
-        plugin("dev.blachut.svelte.lang", version = "251.23774.318")
+        plugin("dev.blachut.svelte.lang", version = "253.29346.45")
     }
 }
 
