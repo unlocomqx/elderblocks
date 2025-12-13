@@ -72,7 +72,7 @@ class EditorFileHandler {
                         if (settings.reFoldAfterManualUnfold == 0) {
                             return
                         }
-                        val filePath = foldRegion.editor.virtualFile.path
+                        val filePath = foldRegion.editor.virtualFile?.path
                         if (filePath != file.path || foldProcessed[filePath] != true || !ages.containsKey(filePath)) {
                             return
                         }
@@ -277,7 +277,10 @@ class EditorFileHandler {
     }
 
     private fun getFoldRegionParents(foldRegion: FoldRegion): List<FoldRegion> {
-        val filePath = foldRegion.editor.virtualFile.path
+        val filePath = foldRegion.editor.virtualFile?.path
+        if (filePath === null) {
+            return listOf();
+        }
         val parents = mutableListOf(foldRegion)
         val foldRegions = getFoldingBlocksForFile(filePath)
         foldRegions.filter { it.startOffset < foldRegion.startOffset && it.endOffset > foldRegion.endOffset }
@@ -285,7 +288,7 @@ class EditorFileHandler {
         return parents
     }
 
-    private fun getCursorPosition(editor: Editor): Int? {
+    private fun getCursorPosition(editor: Editor): Int {
         return editor.caretModel.offset
     }
 }

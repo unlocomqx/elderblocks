@@ -26,7 +26,7 @@ dependencies {
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
 
         // Add necessary plugin dependencies for compilation here, example:
-        plugin("dev.blachut.svelte.lang", version = "253.29346.45")
+        plugin("dev.blachut.svelte.lang", version = "253.28294.251")
     }
 }
 
