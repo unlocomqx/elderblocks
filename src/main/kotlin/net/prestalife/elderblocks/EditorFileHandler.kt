@@ -31,22 +31,45 @@ class EditorFileHandler {
     private var scheduledTask: ScheduledFuture<*>? = null
 
     val foldProcessed = mutableMapOf<String, Boolean>()
+    private val registeredEditors = mutableSetOf<Editor>()
 
     val delaySeconds = 5L
 
     val log = Logger.getInstance(EditorFileHandler::class.java)
 
+    private val globalCaretListener = object : CaretListener {
+        override fun caretPositionChanged(event: CaretEvent) {
+            val virtualFile = event.editor.virtualFile ?: return
+            val filePath = virtualFile.path
+            if (!ages.containsKey(filePath)) return
+
+            val position = event.editor.caretModel.offset
+            getFoldingBlocksForFile(filePath).forEach { region ->
+                if (!region.isExpanded) return@forEach
+                if (region.startOffset <= position && region.endOffset >= position) {
+                    val (hash) = getFoldingRegionHash(region)
+                    if (ages[filePath]?.containsKey(hash) == true) {
+                        val age = -(settings.reFoldAfterManualUnfold - settings.oldAge).toLong() * 1000
+                        val currentAge = ages[filePath]?.get(hash) ?: 0L
+                        ages[filePath]?.put(hash, min(currentAge, age))
+                        log.info("Setting age of ${region.startOffset} to ${region.endOffset} from ${currentAge / 1000} to ${age / 1000}")
+                    }
+                }
+            }
+            log.info("Caret moved to $position")
+        }
+    }
+
     constructor(project: Project) {
         this.project = project
 
-        // Schedule a periodic task
+        EditorFactory.getInstance().eventMulticaster.addCaretListener(globalCaretListener, project)
+
         scheduledTask = AppExecutorUtil.getAppScheduledExecutorService().scheduleWithFixedDelay(
-            {
-                foldOldBlocks()
-            },
-            delaySeconds,    // Initial delay
-            delaySeconds,    // Period between executions
-            TimeUnit.SECONDS  // Time unit
+            { foldOldBlocks() },
+            delaySeconds,
+            delaySeconds,
+            TimeUnit.SECONDS
         )
     }
 
@@ -59,7 +82,6 @@ class EditorFileHandler {
                 ages[file.path] = mutableMapOf()
                 foldProcessed.remove(file.path)
                 val foldingBlocks = getFoldingBlocks(editor)
-                // Process folding blocks as needed
                 foldingBlocks.forEach { foldRegion ->
                     if (foldRegion.isExpanded) {
                         val (hash) = getFoldingRegionHash(foldRegion)
@@ -67,74 +89,50 @@ class EditorFileHandler {
                     }
                 }
 
-                // Add folding listener to detect when blocks are unfolded
-                (editor as EditorEx).foldingModel.addListener(object : FoldingListener {
-                    override fun onFoldRegionStateChange(foldRegion: FoldRegion) {
-                        if (settings.reFoldAfterManualUnfold == 0) {
-                            return
-                        }
-                        val filePath = foldRegion.editor.virtualFile?.path
-                        if (filePath != file.path || foldProcessed[filePath] != true || !ages.containsKey(filePath)) {
-                            return
-                        }
-                        if (foldRegion.isExpanded) {
-                            getFoldRegionParents(foldRegion).forEach { _ ->
-                                val (hash, lines) = getFoldingRegionHash(foldRegion)
-                                if (settings.minBlockLines > 0 && lines < settings.minBlockLines) {
-                                    return@forEach
+                if (!registeredEditors.contains(editor)) {
+                    registeredEditors.add(editor)
+                    log.info("Editor registered")
+                    (editor as EditorEx).foldingModel.addListener(object : FoldingListener {
+                        override fun onFoldRegionStateChange(foldRegion: FoldRegion) {
+                            if (settings.reFoldAfterManualUnfold == 0) return
+                            val filePath = foldRegion.editor.virtualFile?.path ?: return
+                            if (foldProcessed[filePath] != true || !ages.containsKey(filePath)) return
+
+                            if (foldRegion.isExpanded) {
+                                getFoldRegionParents(foldRegion).forEach { _ ->
+                                    val (hash, lines) = getFoldingRegionHash(foldRegion)
+                                    if (settings.minBlockLines > 0 && lines < settings.minBlockLines) return@forEach
+                                    val currentFoldingBlocks = getFoldingBlocksForFile(filePath)
+                                    if (!settings.foldTopLevelBlocks && isTopLevelBlock(
+                                            currentFoldingBlocks,
+                                            foldRegion
+                                        )
+                                    ) return@forEach
+                                    val age = -(settings.reFoldAfterManualUnfold - settings.oldAge).toLong() * 1000
+                                    ages[filePath]?.put(hash, age)
+                                    log.info("Setting age of ${foldRegion.startOffset} to ${foldRegion.endOffset} to ${age / 1000}")
                                 }
-                                if (!settings.foldTopLevelBlocks && isTopLevelBlock(foldingBlocks, foldRegion)) {
-                                    return@forEach
-                                }
-                                val age = -(settings.reFoldAfterManualUnfold - settings.oldAge).toLong() * 1000
-                                ages[filePath]?.put(hash, age)
-                                log.info("Setting age of ${foldRegion.startOffset} to ${foldRegion.endOffset} to ${age / 1000}")
                             }
                         }
-                    }
 
-                    override fun onFoldProcessingEnd() {
-                        foldProcessed[file.path] = true
-                        super.onFoldProcessingEnd()
-                    }
-                }, fileEditor)
-
-                EditorFactory.getInstance()
-                    .eventMulticaster
-                    .addCaretListener(object : CaretListener {
-                        override fun caretPositionChanged(event: CaretEvent) {
-                            val virtualFile = event.editor.virtualFile ?: return
-                            val filePath = virtualFile.path
-                            if (filePath != file.path) {
-                                return
-                            }
-                            val position = event.editor.caretModel.offset
-                            getFoldingBlocksForFile(filePath).forEach { region ->
-                                if (!region.isExpanded) {
-                                    return@forEach
-                                }
-                                if (region.startOffset <= position && region.endOffset >= position) {
-                                    val (hash) = getFoldingRegionHash(region)
-                                    if (ages[filePath]?.containsKey(hash) == true) {
-                                        val age =
-                                            -(settings.reFoldAfterManualUnfold - settings.oldAge).toLong() * 1000
-                                        val currentAge = ages[filePath]?.get(hash) ?: 0L
-                                        ages[filePath]?.put(hash, min(currentAge, age))
-                                        log.info("Setting age of ${region.startOffset} to ${region.endOffset} from ${currentAge / 1000} to ${age / 1000}")
-                                    }
-                                }
-                            }
-
-                            log.info("Caret moved to $position")
+                        override fun onFoldProcessingEnd() {
+                            val filePath = editor.virtualFile?.path ?: return
+                            foldProcessed[filePath] = true
                         }
                     }, fileEditor)
+                }
             }
         }
     }
 
     fun fileClosed(file: VirtualFile) {
-        ages.entries.removeIf { it.key == file.path }
+        ages.remove(file.path)
         foldProcessed.remove(file.path)
+        val editor = getEditorForFile(FileEditorManager.getInstance(project), file)
+        if (editor != null) {
+            log.info("Editor removed")
+            registeredEditors.remove(editor)
+        }
     }
 
     private fun getEditorForFile(fileEditorManager: FileEditorManager, file: VirtualFile): Editor? {
