@@ -42,7 +42,7 @@ class EditorFileHandler {
         // Schedule a periodic task
         scheduledTask = AppExecutorUtil.getAppScheduledExecutorService().scheduleWithFixedDelay(
             {
-                // Your periodic task logic here
+                log.debug("Periodic task executed")
                 foldOldBlocks()
             },
             0,    // Initial delay
@@ -56,6 +56,7 @@ class EditorFileHandler {
         val editor = getEditorForFile(source, file)
         if (editor != null && fileEditor != null) {
             ApplicationManager.getApplication().runReadAction {
+                log.debug("File opened: ${file.path}")
                 ages[file.path] = mutableMapOf()
                 foldProcessed.remove(file.path)
                 val foldingBlocks = getFoldingBlocks(editor)
@@ -78,7 +79,7 @@ class EditorFileHandler {
                             return
                         }
                         if (foldRegion.isExpanded) {
-                            getFoldRegionParents(foldRegion).forEach { region ->
+                            getFoldRegionParents(foldRegion).forEach { _ ->
                                 val (hash, lines) = getFoldingRegionHash(foldRegion)
                                 if (settings.minBlockLines > 0 && lines < settings.minBlockLines) {
                                     return@forEach
@@ -103,10 +104,7 @@ class EditorFileHandler {
                     .eventMulticaster
                     .addCaretListener(object : CaretListener {
                         override fun caretPositionChanged(event: CaretEvent) {
-                            val virtualFile = event.editor.virtualFile
-                            if (virtualFile == null) {
-                                return
-                            }
+                            val virtualFile = event.editor.virtualFile ?: return
                             val filePath = virtualFile.path
                             if (filePath != file.path) {
                                 return
@@ -175,10 +173,7 @@ class EditorFileHandler {
                 WriteCommandAction.runWriteCommandAction(project) {
                     ages.forEach { age ->
                         val filePath = age.key
-                        val foldingModel = getFoldingModel(filePath)
-                        if (foldingModel == null) {
-                            return@forEach
-                        }
+                        val foldingModel = getFoldingModel(filePath) ?: return@forEach
                         val foldingBlocks = getFoldingBlocksForFile(filePath)
                         val seenContentKeys = mutableListOf<Int>()
                         foldingBlocks.forEach { foldRegion ->
@@ -193,7 +188,7 @@ class EditorFileHandler {
                                 ages[filePath]?.remove(contentHash)
                                 return@forEach
                             }
-                            if (!settings.foldFocusedBlocks && cursorPosition != null && cursorPosition > foldRegion.startOffset && cursorPosition < foldRegion.endOffset) {
+                            if (!settings.foldFocusedBlocks && cursorPosition > foldRegion.startOffset && cursorPosition < foldRegion.endOffset) {
                                 ages[filePath]?.remove(contentHash)
                                 return@forEach
                             }
@@ -208,7 +203,7 @@ class EditorFileHandler {
                                 regionAge > settings.oldAge * 1000
                             ) {
                                 val foldingModelRegions = foldingModelsMap.getOrDefault(foldingModel, emptyList())
-                                foldingModelsMap.put(foldingModel, foldingModelRegions + foldRegion)
+                                foldingModelsMap[foldingModel] = foldingModelRegions + foldRegion
                                 ages[filePath]?.remove(contentHash)
                                 log.debug("Folding block at ${foldRegion.startOffset} to ${foldRegion.endOffset} with age ${regionAge / 1000} > ${settings.oldAge}")
                             }
@@ -280,7 +275,7 @@ class EditorFileHandler {
     private fun getFoldRegionParents(foldRegion: FoldRegion): List<FoldRegion> {
         val filePath = foldRegion.editor.virtualFile?.path
         if (filePath === null) {
-            return listOf();
+            return listOf()
         }
         val parents = mutableListOf(foldRegion)
         val foldRegions = getFoldingBlocksForFile(filePath)
