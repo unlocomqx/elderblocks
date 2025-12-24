@@ -1,7 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Run Plugin" type="GradleRunConfiguration" factoryName="Gradle">
+  <configuration default="false" name="Run Plugin" type="GradleRunConfiguration" factoryName="Gradle" focusToolWindowBeforeRun="true" show_console_on_std_err="true" show_console_on_std_out="true">
     <output_file path="$USER_HOME$/Downloads/elderblocks.log" />
-    <log_file alias="idea.log" path="$PROJECT_DIR$/build/idea-sandbox/PS-2025.1/log/idea.log" />
+    <log_file alias="idea.log" path="$PROJECT_DIR$/build/idea-sandbox/PS-2025.3/log/idea.log" />
+    <log_file checked="false" alias="this.log" path="$USER_HOME$/Library/Logs/JetBrains/IntelliJIdea2025.2/idea.log" />
     <ExternalSystemSettings>
       <option name="env">
         <map>

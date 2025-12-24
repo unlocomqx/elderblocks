@@ -42,7 +42,6 @@ class EditorFileHandler {
         // Schedule a periodic task
         scheduledTask = AppExecutorUtil.getAppScheduledExecutorService().scheduleWithFixedDelay(
             {
-                log.debug("Periodic task executed")
                 foldOldBlocks()
             },
             delaySeconds,    // Initial delay
@@ -56,7 +55,7 @@ class EditorFileHandler {
         val editor = getEditorForFile(source, file)
         if (editor != null && fileEditor != null) {
             ApplicationManager.getApplication().runReadAction {
-                log.debug("File opened: ${file.path}")
+                log.info("File opened: ${file.path.takeLast(20)}")
                 ages[file.path] = mutableMapOf()
                 foldProcessed.remove(file.path)
                 val foldingBlocks = getFoldingBlocks(editor)
@@ -89,7 +88,7 @@ class EditorFileHandler {
                                 }
                                 val age = -(settings.reFoldAfterManualUnfold - settings.oldAge).toLong() * 1000
                                 ages[filePath]?.put(hash, age)
-                                log.debug("Setting age of ${foldRegion.startOffset} to ${foldRegion.endOffset} to ${age / 1000}")
+                                log.info("Setting age of ${foldRegion.startOffset} to ${foldRegion.endOffset} to ${age / 1000}")
                             }
                         }
                     }
@@ -121,12 +120,12 @@ class EditorFileHandler {
                                             -(settings.reFoldAfterManualUnfold - settings.oldAge).toLong() * 1000
                                         val currentAge = ages[filePath]?.get(hash) ?: 0L
                                         ages[filePath]?.put(hash, min(currentAge, age))
-                                        log.debug("Setting age of ${region.startOffset} to ${region.endOffset} from ${currentAge / 1000} to ${age / 1000}")
+                                        log.info("Setting age of ${region.startOffset} to ${region.endOffset} from ${currentAge / 1000} to ${age / 1000}")
                                     }
                                 }
                             }
 
-                            log.debug("Caret moved to $position")
+                            log.info("Caret moved to $position")
                         }
                     }, fileEditor)
             }
@@ -151,7 +150,7 @@ class EditorFileHandler {
     }
 
     private fun foldOldBlocks() {
-        log.info("Folding old blocks")
+        log.info("------")
         val now = System.currentTimeMillis()
         if (lastAgeUpdate == 0L) {
             lastAgeUpdate = now
@@ -205,7 +204,7 @@ class EditorFileHandler {
                                 val foldingModelRegions = foldingModelsMap.getOrDefault(foldingModel, emptyList())
                                 foldingModelsMap[foldingModel] = foldingModelRegions + foldRegion
                                 ages[filePath]?.remove(contentHash)
-                                log.debug("Folding block of file ${filePath} at ${foldRegion.startOffset} to ${foldRegion.endOffset} with age ${regionAge / 1000} > ${settings.oldAge}")
+                                log.info("Folding block of file ${filePath.takeLast(20)} at ${foldRegion.startOffset} to ${foldRegion.endOffset} with age ${regionAge} > ${settings.oldAge * 1000}")
                             }
 
                             // if the block does not exist in ages, add it
