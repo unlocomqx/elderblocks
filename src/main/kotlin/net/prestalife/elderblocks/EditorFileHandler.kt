@@ -57,6 +57,7 @@ class EditorFileHandler {
         if (editor != null && fileEditor != null) {
             ApplicationManager.getApplication().runReadAction {
                 ages[file.path] = mutableMapOf()
+                foldProcessed.remove(file.path)
                 val foldingBlocks = getFoldingBlocks(editor)
                 // Process folding blocks as needed
                 foldingBlocks.forEach { foldRegion ->
