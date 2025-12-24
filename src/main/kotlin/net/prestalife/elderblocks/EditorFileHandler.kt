@@ -45,7 +45,7 @@ class EditorFileHandler {
                 log.debug("Periodic task executed")
                 foldOldBlocks()
             },
-            0,    // Initial delay
+            delaySeconds,    // Initial delay
             delaySeconds,    // Period between executions
             TimeUnit.SECONDS  // Time unit
         )
@@ -126,7 +126,7 @@ class EditorFileHandler {
                                 }
                             }
 
-                            println("Caret moved to $position")
+                            log.debug("Caret moved to $position")
                         }
                     }, fileEditor)
             }
@@ -205,7 +205,7 @@ class EditorFileHandler {
                                 val foldingModelRegions = foldingModelsMap.getOrDefault(foldingModel, emptyList())
                                 foldingModelsMap[foldingModel] = foldingModelRegions + foldRegion
                                 ages[filePath]?.remove(contentHash)
-                                log.debug("Folding block at ${foldRegion.startOffset} to ${foldRegion.endOffset} with age ${regionAge / 1000} > ${settings.oldAge}")
+                                log.debug("Folding block of file ${filePath} at ${foldRegion.startOffset} to ${foldRegion.endOffset} with age ${regionAge / 1000} > ${settings.oldAge}")
                             }
 
                             // if the block does not exist in ages, add it
