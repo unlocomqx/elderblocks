@@ -54,7 +54,7 @@ tasks {
 
     patchPluginXml {
         sinceBuild.set(properties("pluginSinceBuild"))
-        untilBuild.set(properties("pluginUntilBuild"))
+        // untilBuild.set(properties("pluginUntilBuild"))
     }
 
     signPlugin {
